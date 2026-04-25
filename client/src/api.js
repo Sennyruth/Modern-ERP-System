@@ -1,4 +1,4 @@
-const BASE = "http://localhost:3000/api"
+const BASE = "https://modern-erp-system.onrender.com"
 
 async function req(method, path, body) {
   const res = await fetch(`${BASE}${path}`, {

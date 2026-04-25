@@ -20,6 +20,13 @@ app.use(cors())
 app.use(express.json())
 app.use(morgan('dev'))
 
+app.use(cors({
+  origin: [
+    "http://localhost:5173",
+    "https://modern-erp-system-1.onrender.com"  // add your actual frontend URL
+  ]
+}))
+
 // ── Health check ──────────────────────────────────────────
 app.get('/health', async (_req, res) => {
   try {
