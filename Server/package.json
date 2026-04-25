@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "RetailOS ERP REST API — Node.js + Express + Prisma + PostgreSQL",
   "type": "module",
-  "main": "src/app.js",
+  "main": "app.js",
   "scripts": {
     "dev": "node --watch app.js",
     "start": "node app.js",
