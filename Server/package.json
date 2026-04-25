@@ -1,0 +1,27 @@
+{
+  "name": "retailos-erp-api",
+  "version": "1.0.0",
+  "description": "RetailOS ERP REST API — Node.js + Express + Prisma + PostgreSQL",
+  "type": "module",
+  "main": "src/app.js",
+  "scripts": {
+    "dev": "node --watch app.js",
+    "start": "node app.js",
+    "db:migrate": "prisma migrate dev",
+    "db:push": "prisma db push",
+    "db:seed": "node prisma/seed.js",
+    "db:studio": "prisma studio",
+    "generate": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.14.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^4.19.2",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.14.0"
+  }
+}

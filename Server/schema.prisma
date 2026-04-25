@@ -1,0 +1,296 @@
+// RetailOS ERP — Prisma Schema
+// Stack: Node.js + PostgreSQL
+// Modules: Sales & CRM | Inventory & Warehouse | HR & Payroll
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// SHARED
+// ============================================================
+
+model Country {
+  code      String     @id @db.Char(2)
+  name      String     @db.VarChar(80)
+  // customers Customer[]
+}
+
+// ============================================================
+// MODULE 1: SALES & CRM
+// ============================================================
+
+enum CustomerSegment {
+  new
+  regular
+  vip
+}
+
+enum OrderChannel {
+  online
+  in_store
+  phone
+}
+
+enum OrderStatus {
+  pending
+  processing
+  fulfilled
+  returned
+  cancelled
+}
+
+enum InteractionType {
+  call
+  email
+  chat
+  in_store
+  note
+}
+
+model Customer {
+  id           String           @id @default(uuid())
+  firstName    String           @db.VarChar(80)
+  lastName     String           @db.VarChar(80)
+  email        String           @unique @db.VarChar(255)
+  phone        String?          @db.VarChar(30)
+  segment      CustomerSegment  @default(new)
+  countryCode  String?          @db.Char(2)
+  // country      Country?         @relation(fields: [countryCode], references: [code])
+  orders       Order[]
+  interactions CrmInteraction[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([email])
+  @@index([segment])
+}
+
+model Order {
+  id           String      @id @default(uuid())
+  customer     Customer    @relation(fields: [customerId], references: [id])
+  customerId   String
+  channel      OrderChannel @default(online)
+  status       OrderStatus  @default(pending)
+  shippingAddr String?
+  notes        String?
+  subtotal     Decimal     @default(0) @db.Decimal(12, 2)
+  discount     Decimal     @default(0) @db.Decimal(12, 2)
+  tax          Decimal     @default(0) @db.Decimal(12, 2)
+  items        OrderItem[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([customerId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+}
+
+model OrderItem {
+  id        String   @id @default(uuid())
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId   String
+  product   Product  @relation(fields: [productId], references: [id])
+  productId String
+  sku       String   @db.VarChar(50)
+  name      String   @db.VarChar(255)
+  qty       Int
+  unitPrice Decimal  @db.Decimal(12, 2)
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model CrmInteraction {
+  id          String          @id @default(uuid())
+  customer    Customer        @relation(fields: [customerId], references: [id])
+  customerId  String
+  type        InteractionType
+  summary     String?
+  handledBy   Employee?       @relation(fields: [handledById], references: [id])
+  handledById String?
+  createdAt   DateTime        @default(now())
+
+  @@index([customerId])
+}
+
+// ============================================================
+// MODULE 2: INVENTORY & WAREHOUSE
+// ============================================================
+
+enum MovementType {
+  receipt
+  sale
+  return
+  adjustment
+  transfer
+}
+
+model Category {
+  id       Int        @id @default(autoincrement())
+  name     String     @unique @db.VarChar(80)
+  parentId Int?
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+  products Product[]
+}
+
+model Product {
+  id            String          @id @default(uuid())
+  sku           String          @unique @db.VarChar(50)
+  name          String          @db.VarChar(255)
+  description   String?
+  category      Category?       @relation(fields: [categoryId], references: [id])
+  categoryId    Int?
+  costPrice     Decimal         @default(0) @db.Decimal(12, 2)
+  sellPrice     Decimal         @default(0) @db.Decimal(12, 2)
+  reorderPoint  Int             @default(10)
+  reorderQty    Int             @default(50)
+  isActive      Boolean         @default(true)
+  stock         Stock[]
+  movements     StockMovement[]
+  orderItems    OrderItem[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([sku])
+  @@index([categoryId])
+}
+
+model Warehouse {
+  id        String          @id @default(uuid())
+  name      String          @db.VarChar(100)
+  location  String?
+  isActive  Boolean         @default(true)
+  zones     WarehouseZone[]
+  stock     Stock[]
+  movements StockMovement[]
+}
+
+model WarehouseZone {
+  id          String    @id @default(uuid())
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+  warehouseId String
+  name        String    @db.VarChar(50)
+  description String?
+  stock       Stock[]
+}
+
+model Stock {
+  id           String         @id @default(uuid())
+  product      Product        @relation(fields: [productId], references: [id])
+  productId    String
+  warehouse    Warehouse      @relation(fields: [warehouseId], references: [id])
+  warehouseId  String
+  zone         WarehouseZone? @relation(fields: [zoneId], references: [id])
+  zoneId       String?
+  qtyOnHand    Int            @default(0)
+  qtyReserved  Int            @default(0)
+
+  @@unique([productId, warehouseId])
+  @@index([productId])
+  @@index([warehouseId])
+}
+
+model StockMovement {
+  id           String       @id @default(uuid())
+  product      Product      @relation(fields: [productId], references: [id])
+  productId    String
+  warehouse    Warehouse    @relation(fields: [warehouseId], references: [id])
+  warehouseId  String
+  movementType MovementType
+  qty          Int          // positive = in, negative = out
+  referenceId  String?      // orderId or supplierReceiptId
+  note         String?
+  createdBy    Employee?    @relation(fields: [createdById], references: [id])
+  createdById  String?
+  createdAt    DateTime     @default(now())
+
+  @@index([productId])
+  @@index([warehouseId])
+  @@index([createdAt(sort: Desc)])
+}
+
+// ============================================================
+// MODULE 3: HR & PAYROLL
+// ============================================================
+
+enum EmploymentType {
+  full_time
+  part_time
+  contractor
+}
+
+enum EmployeeStatus {
+  active
+  on_leave
+  terminated
+}
+
+enum PayrollStatus {
+  pending
+  processed
+  failed
+}
+
+model Department {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique @db.VarChar(80)
+  employees Employee[]
+}
+
+model Employee {
+  id             String          @id @default(uuid())
+  firstName      String          @db.VarChar(80)
+  lastName       String          @db.VarChar(80)
+  email          String          @unique @db.VarChar(255)
+  phone          String?         @db.VarChar(30)
+  role           String          @db.VarChar(100)
+  department     Department?     @relation(fields: [departmentId], references: [id])
+  departmentId   Int?
+  employmentType EmploymentType  @default(full_time)
+  status         EmployeeStatus  @default(active)
+  startDate      DateTime        @db.Date
+  endDate        DateTime?       @db.Date
+  baseSalary     Decimal         @db.Decimal(12, 2)
+  payrollEntries PayrollEntry[]
+  interactions   CrmInteraction[]
+  movements      StockMovement[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([departmentId])
+  @@index([status])
+}
+
+model PayrollRun {
+  id         String         @id @default(uuid())
+  periodFrom DateTime       @db.Date
+  periodTo   DateTime       @db.Date
+  runDate    DateTime       @default(now())
+  entries    PayrollEntry[]
+  createdAt  DateTime       @default(now())
+}
+
+model PayrollEntry {
+  id           String        @id @default(uuid())
+  payrollRun   PayrollRun    @relation(fields: [payrollRunId], references: [id])
+  payrollRunId String
+  employee     Employee      @relation(fields: [employeeId], references: [id])
+  employeeId   String
+  hoursWorked  Decimal?      @db.Decimal(6, 2)
+  basePay      Decimal       @db.Decimal(12, 2)
+  deductions   Decimal       @default(0) @db.Decimal(12, 2)
+  bonuses      Decimal       @default(0) @db.Decimal(12, 2)
+  netPay       Decimal       @db.Decimal(12, 2)
+  status       PayrollStatus @default(pending)
+  createdAt    DateTime      @default(now())
+
+  @@unique([payrollRunId, employeeId])
+  @@index([employeeId])
+}
