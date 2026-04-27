@@ -1,4 +1,4 @@
-const BASE = "https://modern-erp-system.onrender.com/api"
+const BASE = import.meta.env.VITE_API_URL || "http://localhost:3000/api"
 
 async function req(method, path, body) {
   const res = await fetch(`${BASE}${path}`, {
