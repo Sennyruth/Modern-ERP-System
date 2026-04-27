@@ -1,4 +1,4 @@
-const BASE = "https://modern-erp-system.onrender.com"
+const BASE = "https://modern-erp-system.onrender.com/api"
 
 async function req(method, path, body) {
   const res = await fetch(`${BASE}${path}`, {
